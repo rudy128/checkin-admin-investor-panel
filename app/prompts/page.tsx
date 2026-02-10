@@ -258,8 +258,8 @@ export default function PromptsPage() {
                 )}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-start gap-2">
-                    <CardTitle className="min-h-[2.75rem] flex-1 text-base leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden break-words">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <CardTitle className="min-h-[2.75rem] min-w-0 max-w-full flex-1 overflow-hidden text-ellipsis text-base leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [overflow-wrap:anywhere]">
                       {prompt.name}
                     </CardTitle>
                     <div className="flex items-center gap-1">
@@ -290,7 +290,7 @@ export default function PromptsPage() {
                 </CardHeader>
 
                 <CardContent className="flex-1 overflow-hidden pt-0">
-                  <p className="text-muted-foreground text-sm leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:8] overflow-hidden break-words">
+                  <p className="text-muted-foreground max-w-full overflow-hidden text-ellipsis whitespace-pre-wrap text-sm leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:8] [overflow-wrap:anywhere]">
                     {prompt.prompt}
                   </p>
                 </CardContent>
