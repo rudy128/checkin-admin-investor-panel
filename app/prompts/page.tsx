@@ -16,6 +16,7 @@ import {
   type AdminPromptUpsertRequest,
 } from "@/lib/api/admin-browser"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -43,7 +44,6 @@ export default function PromptsPage() {
   const [loading, setLoading] = React.useState(true)
   const [refreshing, setRefreshing] = React.useState(false)
   const [error, setError] = React.useState("")
-  const [message, setMessage] = React.useState("")
 
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
@@ -69,6 +69,7 @@ export default function PromptsPage() {
       setPrompts(data)
     } catch {
       setError("Failed to load prompts.")
+      toast.error("Failed to load prompts.")
       setPrompts([])
     } finally {
       setLoading(false)
@@ -83,7 +84,6 @@ export default function PromptsPage() {
   async function onCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setCreating(true)
-    setMessage("")
     setError("")
 
     try {
@@ -92,13 +92,14 @@ export default function PromptsPage() {
         prompt: createPrompt,
       }
       const result = await adminPromptsApi.create(payload)
-      setMessage(result.message || "Prompt created.")
+      toast.success(result.message || "Prompt created.")
       setCreateName("")
       setCreatePrompt("")
       setCreateOpen(false)
       await loadPrompts(true)
     } catch {
       setError("Failed to create prompt.")
+      toast.error("Failed to create prompt.")
     } finally {
       setCreating(false)
     }
@@ -108,7 +109,6 @@ export default function PromptsPage() {
     setEditingPrompt(prompt)
     setEditName(prompt.name)
     setEditPrompt(prompt.prompt)
-    setMessage("")
     setError("")
   }
 
@@ -119,7 +119,6 @@ export default function PromptsPage() {
     }
 
     setSavingId(editingPrompt.id)
-    setMessage("")
     setError("")
 
     try {
@@ -128,11 +127,12 @@ export default function PromptsPage() {
         prompt: editPrompt,
       }
       const result = await adminPromptsApi.update(editingPrompt.id, payload)
-      setMessage(result.message || "Prompt updated.")
+      toast.success(result.message || "Prompt updated.")
       setEditingPrompt(null)
       await loadPrompts(true)
     } catch {
       setError("Failed to update prompt.")
+      toast.error("Failed to update prompt.")
     } finally {
       setSavingId(null)
     }
@@ -145,18 +145,18 @@ export default function PromptsPage() {
     }
 
     setDeletingId(id)
-    setMessage("")
     setError("")
 
     try {
       const result = await adminPromptsApi.remove(id)
-      setMessage(result.message || "Prompt deleted.")
+      toast.success(result.message || "Prompt deleted.")
       if (editingPrompt?.id === id) {
         setEditingPrompt(null)
       }
       await loadPrompts(true)
     } catch {
       setError("Failed to delete prompt.")
+      toast.error("Failed to delete prompt.")
     } finally {
       setDeletingId(null)
     }
@@ -235,7 +235,6 @@ export default function PromptsPage() {
         </div>
       </section>
 
-      {message && <p className="mb-3 text-sm text-green-600">{message}</p>}
       {error && <p className="text-destructive mb-3 text-sm">{error}</p>}
 
       {loading ? (

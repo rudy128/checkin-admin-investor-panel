@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppHeader } from "@/components/app-header";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
+import { AppToaster } from "@/components/providers/app-toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
             </AuthGate>
           </main>
         </div>
+        <AppToaster />
       </body>
     </html>
   );
