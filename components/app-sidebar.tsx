@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { LayoutDashboardIcon, MessagesSquareIcon, UsersIcon } from "lucide-react"
+import { CalendarClockIcon, LayoutDashboardIcon, MessagesSquareIcon, UsersIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
@@ -21,6 +21,11 @@ const navItems = [
     href: "/prompts",
     label: "Prompts",
     icon: MessagesSquareIcon,
+  },
+  {
+    href: "/scheduler",
+    label: "Scheduler",
+    icon: CalendarClockIcon,
   },
 ] as const
 

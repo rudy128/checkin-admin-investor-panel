@@ -93,6 +93,64 @@ export type AdminPromptMutationResponse = {
   prompt: AdminPromptTableRow
 }
 
+export type AdminSchedulerConfigRow = {
+  id: string
+  jobName: string
+  displayName: string
+  description: string
+  cronExpression: string
+  isEnabled: boolean
+  model: string
+  cardsPerUser: number
+  batchSize: number
+  delayBetweenBatchesMs: number
+  targetUsers: unknown
+  skipInactiveDays: number
+  lastRun: string | null
+  nextRunAt: string | null
+  totalRuns: number
+  createdAt: string
+  [key: string]: unknown
+}
+
+export type AdminSchedulerLogRow = {
+  id: string
+  schedulerJobId: string
+  lastRunAt: string
+  lastRunStatus: string
+  lastRunSummary: Record<string, unknown> | null
+  [key: string]: unknown
+}
+
+export type AdminSchedulerResponse = {
+  configuration: AdminSchedulerConfigRow[]
+  scheduler_logs: AdminSchedulerLogRow[]
+}
+
+export type AdminSchedulerUpdateRequest = {
+  job_name: string
+  display_name: string
+  description: string
+  cron_expression: string
+  is_enabled: boolean
+  model: string
+  cards_per_user: number
+  batch_size: number
+  delay_between_batches_ms: number
+  target_users: string[] | string | Record<string, unknown>
+  skip_inactive_days: number
+}
+
+export type AdminSchedulerMutationResponse = {
+  message: string
+  configuration: AdminSchedulerConfigRow
+}
+
+export type AdminSchedulerStartResponse = {
+  message: string
+  triggered_at: string
+}
+
 const REQUEST_CACHE_TTL_MS = 10_000
 const requestCache = new Map<string, { expiresAt: number; data: unknown }>()
 const inFlightRequests = new Map<string, Promise<unknown>>()
@@ -251,6 +309,278 @@ function normalizePromptMutationPayload(payload: unknown): AdminPromptMutationRe
   return {
     message: typeof payload.message === "string" ? payload.message : "",
     prompt,
+  }
+}
+
+function coerceInteger(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)) {
+    return value
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed) && Number.isInteger(parsed)) {
+      return parsed
+    }
+  }
+
+  return null
+}
+
+function coerceBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value
+  }
+
+  if (typeof value === "string") {
+    if (value === "true") {
+      return true
+    }
+    if (value === "false") {
+      return false
+    }
+  }
+
+  return null
+}
+
+function coerceSchedulerConfigRow(value: unknown): AdminSchedulerConfigRow | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const id = typeof value.id === "string" ? value.id : null
+  const jobName =
+    typeof value.jobName === "string"
+      ? value.jobName
+      : typeof value.job_name === "string"
+        ? value.job_name
+        : null
+  const displayName =
+    typeof value.displayName === "string"
+      ? value.displayName
+      : typeof value.display_name === "string"
+        ? value.display_name
+        : null
+  const description = typeof value.description === "string" ? value.description : null
+  const cronExpression =
+    typeof value.cronExpression === "string"
+      ? value.cronExpression
+      : typeof value.cron_expression === "string"
+        ? value.cron_expression
+        : null
+  const isEnabled =
+    coerceBoolean(
+      typeof value.isEnabled === "boolean"
+        ? value.isEnabled
+        : value.is_enabled
+    )
+  const model = typeof value.model === "string" ? value.model : null
+  const cardsPerUser = coerceInteger(
+    typeof value.cardsPerUser === "number" || typeof value.cardsPerUser === "string"
+      ? value.cardsPerUser
+      : value.cards_per_user
+  )
+  const batchSize = coerceInteger(
+    typeof value.batchSize === "number" || typeof value.batchSize === "string"
+      ? value.batchSize
+      : value.batch_size
+  )
+  const delayBetweenBatchesMs = coerceInteger(
+    typeof value.delayBetweenBatchesMs === "number" || typeof value.delayBetweenBatchesMs === "string"
+      ? value.delayBetweenBatchesMs
+      : value.delay_between_batches_ms
+  )
+  const targetUsers = value.targetUsers ?? value.target_users ?? null
+  const skipInactiveDays = coerceInteger(
+    typeof value.skipInactiveDays === "number" || typeof value.skipInactiveDays === "string"
+      ? value.skipInactiveDays
+      : value.skip_inactive_days
+  )
+  const lastRun =
+    typeof value.lastRun === "string" || value.lastRun === null
+      ? value.lastRun
+      : typeof value.last_run === "string" || value.last_run === null
+        ? value.last_run
+        : null
+  const nextRunAt =
+    typeof value.nextRunAt === "string" || value.nextRunAt === null
+      ? value.nextRunAt
+      : typeof value.next_run_at === "string" || value.next_run_at === null
+        ? value.next_run_at
+        : null
+  const totalRuns = coerceInteger(
+    typeof value.totalRuns === "number" || typeof value.totalRuns === "string"
+      ? value.totalRuns
+      : value.total_runs
+  )
+  const createdAt =
+    typeof value.createdAt === "string"
+      ? value.createdAt
+      : typeof value.created_at === "string"
+        ? value.created_at
+        : null
+
+  if (
+    typeof id !== "string" ||
+    typeof jobName !== "string" ||
+    typeof displayName !== "string" ||
+    typeof description !== "string" ||
+    typeof cronExpression !== "string" ||
+    typeof isEnabled !== "boolean" ||
+    typeof model !== "string" ||
+    typeof cardsPerUser !== "number" ||
+    typeof batchSize !== "number" ||
+    typeof delayBetweenBatchesMs !== "number" ||
+    typeof skipInactiveDays !== "number" ||
+    typeof totalRuns !== "number" ||
+    typeof createdAt !== "string"
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    jobName,
+    displayName,
+    description,
+    cronExpression,
+    isEnabled,
+    model,
+    cardsPerUser,
+    batchSize,
+    delayBetweenBatchesMs,
+    targetUsers,
+    skipInactiveDays,
+    lastRun,
+    nextRunAt,
+    totalRuns,
+    createdAt,
+    ...value,
+  }
+}
+
+function coerceSchedulerLogRow(value: unknown): AdminSchedulerLogRow | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const id = typeof value.id === "string" ? value.id : null
+  const schedulerJobId =
+    typeof value.schedulerJobId === "string"
+      ? value.schedulerJobId
+      : typeof value.scheduler_job_id === "string"
+        ? value.scheduler_job_id
+        : null
+  const lastRunAt =
+    typeof value.lastRunAt === "string"
+      ? value.lastRunAt
+      : typeof value.last_run_at === "string"
+        ? value.last_run_at
+        : null
+  const lastRunStatus =
+    typeof value.lastRunStatus === "string"
+      ? value.lastRunStatus
+      : typeof value.last_run_status === "string"
+        ? value.last_run_status
+        : null
+  const lastRunSummary =
+    isRecord(value.lastRunSummary)
+      ? value.lastRunSummary
+      : isRecord(value.last_run_summary)
+        ? value.last_run_summary
+        : value.lastRunSummary === null || value.last_run_summary === null
+          ? null
+          : null
+
+  if (
+    typeof id !== "string" ||
+    typeof schedulerJobId !== "string" ||
+    typeof lastRunAt !== "string" ||
+    typeof lastRunStatus !== "string"
+  ) {
+    return null
+  }
+
+  return {
+    id,
+    schedulerJobId,
+    lastRunAt,
+    lastRunStatus,
+    lastRunSummary,
+    ...value,
+  }
+}
+
+function normalizeSchedulerPayload(payload: unknown): AdminSchedulerResponse {
+  if (!isRecord(payload)) {
+    return {
+      configuration: [],
+      scheduler_logs: [],
+    }
+  }
+
+  const configurationRaw = Array.isArray(payload.configuration)
+    ? payload.configuration
+    : Array.isArray(payload.scheduler_config)
+      ? payload.scheduler_config
+      : []
+  const logsRaw = Array.isArray(payload.scheduler_logs)
+    ? payload.scheduler_logs
+    : Array.isArray(payload.schedulerLogs)
+      ? payload.schedulerLogs
+      : Array.isArray(payload.logs)
+        ? payload.logs
+        : []
+
+  return {
+    configuration: configurationRaw
+      .map((item) => coerceSchedulerConfigRow(item))
+      .filter((item): item is AdminSchedulerConfigRow => item !== null),
+    scheduler_logs: logsRaw
+      .map((item) => coerceSchedulerLogRow(item))
+      .filter((item): item is AdminSchedulerLogRow => item !== null),
+  }
+}
+
+function normalizeSchedulerMutationPayload(payload: unknown): AdminSchedulerMutationResponse {
+  if (!isRecord(payload)) {
+    throw new Error("Invalid scheduler mutation response payload.")
+  }
+
+  const configuration = coerceSchedulerConfigRow(
+    payload.configuration ?? payload.scheduler ?? payload.data
+  )
+  if (!configuration) {
+    throw new Error("Invalid scheduler configuration row in mutation response.")
+  }
+
+  return {
+    message: typeof payload.message === "string" ? payload.message : "",
+    configuration,
+  }
+}
+
+function normalizeSchedulerStartPayload(payload: unknown): AdminSchedulerStartResponse {
+  if (!isRecord(payload)) {
+    throw new Error("Invalid scheduler start response payload.")
+  }
+
+  const message = typeof payload.message === "string" ? payload.message : ""
+  const triggeredAt =
+    typeof payload.triggered_at === "string"
+      ? payload.triggered_at
+      : typeof payload.triggeredAt === "string"
+        ? payload.triggeredAt
+        : null
+
+  if (!triggeredAt) {
+    throw new Error("Invalid scheduler start response payload.")
+  }
+
+  return {
+    message,
+    triggered_at: triggeredAt,
   }
 }
 
@@ -457,5 +787,38 @@ export const adminPromptsApi = {
     clearCachedRequest("admin-prompts:list")
     clearCachedRequest(`admin-prompts:${id}`)
     return parsed
+  },
+}
+
+export const adminSchedulerApi = {
+  async list(force = false): Promise<AdminSchedulerResponse> {
+    return memoizedRequest({
+      key: "admin-scheduler:list",
+      force,
+      request: async () => {
+        const response = await adminAxios.get<unknown>("/admin/scheduler")
+        const normalized = normalizeSchedulerPayload(response.data)
+        const parsed = adminSchemas.AdminSchedulerResponse.safeParse(normalized)
+        return parsed.success ? (parsed.data as AdminSchedulerResponse) : normalized
+      },
+    })
+  },
+  async start(): Promise<AdminSchedulerStartResponse> {
+    const response = await adminAxios.get<unknown>("/admin/scheduler/start")
+    const normalized = normalizeSchedulerStartPayload(response.data)
+    const parsed = adminSchemas.AdminSchedulerStartResponse.safeParse(normalized)
+    clearCachedRequest("admin-scheduler:list")
+    return parsed.success ? (parsed.data as AdminSchedulerStartResponse) : normalized
+  },
+  async update(
+    id: string,
+    data: AdminSchedulerUpdateRequest
+  ): Promise<AdminSchedulerMutationResponse> {
+    const body = adminSchemas.AdminSchedulerUpdateRequest.parse(data)
+    const response = await adminAxios.put<unknown>(`/admin/scheduler/${id}`, body)
+    const normalized = normalizeSchedulerMutationPayload(response.data)
+    const parsed = adminSchemas.AdminSchedulerMutationResponse.safeParse(normalized)
+    clearCachedRequest("admin-scheduler:list")
+    return parsed.success ? (parsed.data as AdminSchedulerMutationResponse) : normalized
   },
 }
