@@ -1,35 +1,20 @@
 "use client"
 
 import Link from "next/link"
-import { CalendarClockIcon, LayoutDashboardIcon, MessagesSquareIcon, UsersIcon } from "lucide-react"
+import { LayoutDashboardIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
 
 const navItems = [
   {
-    href: "/admin",
+    href: "/investor",
     label: "Dashboard",
     icon: LayoutDashboardIcon,
   },
-  {
-    href: "/admin/users",
-    label: "Users",
-    icon: UsersIcon,
-  },
-  {
-    href: "/admin/prompts",
-    label: "Prompts",
-    icon: MessagesSquareIcon,
-  },
-  {
-    href: "/admin/scheduler",
-    label: "Scheduler",
-    icon: CalendarClockIcon,
-  },
 ] as const
 
-export function AppSidebar() {
+export function InvestorSidebar() {
   const pathname = usePathname()
 
   return (
@@ -37,10 +22,7 @@ export function AppSidebar() {
       <aside className="bg-muted/20 sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-60 shrink-0 overflow-y-auto border-r md:block">
         <nav className="flex flex-col gap-1 p-3">
           {navItems.map((item) => {
-            const active =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link
                 key={item.href}
@@ -61,10 +43,7 @@ export function AppSidebar() {
       <div className="bg-background sticky top-14 z-20 border-b px-3 py-2 md:hidden">
         <nav className="flex gap-2 overflow-x-auto">
           {navItems.map((item) => {
-            const active =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link
                 key={item.href}

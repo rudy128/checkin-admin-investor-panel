@@ -103,7 +103,7 @@ export default function UsersPage() {
                     <tr
                       key={user.id}
                       className="hover:bg-muted/40 cursor-pointer border-t transition-colors"
-                      onClick={() => router.push(`/users/${user.id}`)}
+                      onClick={() => router.push(`/admin/users/${user.id}`)}
                     >
                       <td className="px-3 py-2 font-mono text-xs">{user.id}</td>
                       <td className="px-3 py-2">{user.username || "-"}</td>

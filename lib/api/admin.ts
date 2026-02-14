@@ -59,7 +59,7 @@ export function getCachedAdminMe(authToken: string) {
 }
 
 export function revalidateAdminMeCache() {
-  revalidateTag(ADMIN_ME_CACHE_TAG)
+  revalidateTag(ADMIN_ME_CACHE_TAG, "max")
 }
 
 export function signInAdmin(username: string, password: string) {

@@ -4,7 +4,7 @@ import * as React from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 
-import { adminAuthApi, setAdminAuthToken } from "@/lib/api/admin-browser"
+import { investorAuthApi, setInvestorAuthToken } from "@/lib/api/investor-browser"
 import {
   clearSession,
   getAuthToken,
@@ -12,17 +12,17 @@ import {
   isAuthTokenExpired,
   isRefreshTokenExpired,
   storeRefreshedAuthToken,
-} from "@/lib/auth/admin-session"
+} from "@/lib/auth/investor-session"
 
-const SIGN_IN_PATH = "/admin/signin"
-const HOME_PATH = "/admin"
+const SIGN_IN_PATH = "/investor/signin"
+const HOME_PATH = "/investor"
 const REFRESH_CHECK_INTERVAL_MS = 30 * 1000
 
 function isProtectedPath(pathname: string) {
   return pathname !== SIGN_IN_PATH
 }
 
-export function AuthGate({ children }: { children: React.ReactNode }) {
+export function InvestorAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [authState, setAuthState] = React.useState<
@@ -34,7 +34,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     const refreshToken = getRefreshToken()
     if (!refreshToken || isRefreshTokenExpired()) {
       clearSession()
-      setAdminAuthToken(null)
+      setInvestorAuthToken(null)
       return false
     }
 
@@ -44,18 +44,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     refreshPromiseRef.current = (async () => {
       try {
-        const response = await adminAuthApi.postAdminauthrefresh(undefined, {
+        const response = await investorAuthApi.postInvestorauthrefresh(undefined, {
           headers: {
             "X-Refresh-Token": refreshToken,
           },
         })
 
         storeRefreshedAuthToken(response.auth_token)
-        setAdminAuthToken(response.auth_token)
+        setInvestorAuthToken(response.auth_token)
         return true
       } catch {
         clearSession()
-        setAdminAuthToken(null)
+        setInvestorAuthToken(null)
         return false
       } finally {
         refreshPromiseRef.current = null
@@ -74,7 +74,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
       if (!refreshToken || isRefreshTokenExpired()) {
         clearSession()
-        setAdminAuthToken(null)
+        setInvestorAuthToken(null)
 
         if (protectedPath) {
           router.replace(SIGN_IN_PATH)
@@ -88,7 +88,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
       const authToken = getAuthToken()
       if (authToken) {
-        setAdminAuthToken(authToken)
+        setInvestorAuthToken(authToken)
       }
 
       if (!authToken || isAuthTokenExpired()) {

@@ -103,7 +103,7 @@ export default function UserDetailsPage() {
     <div className="mx-auto w-full max-w-[1400px] p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link href="/users">
+          <Link href="/admin/users">
             <ArrowLeftIcon data-icon="inline-start" />
             Back to Users
           </Link>

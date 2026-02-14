@@ -17,10 +17,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { adminAuthApi, setAdminAuthToken } from "@/lib/api/admin-browser"
-import { clearSession, storeSignInSession } from "@/lib/auth/admin-session"
+import { investorAuthApi, setInvestorAuthToken } from "@/lib/api/investor-browser"
+import { clearSession, storeSignInSession } from "@/lib/auth/investor-session"
 
-export default function SignInPage() {
+export default function InvestorSignInPage() {
   const router = useRouter()
   const [username, setUsername] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -33,17 +33,17 @@ export default function SignInPage() {
     setSubmitting(true)
 
     try {
-      const response = await adminAuthApi.postAdminauthsignin({
+      const response = await investorAuthApi.postInvestorauthsignin({
         username,
         password,
       })
 
       storeSignInSession(response.auth_token, response.refresh_token)
-      setAdminAuthToken(response.auth_token)
-      router.replace("/")
+      setInvestorAuthToken(response.auth_token)
+      router.replace("/investor")
     } catch (error) {
       clearSession()
-      setAdminAuthToken(null)
+      setInvestorAuthToken(null)
 
       if (error instanceof AxiosError) {
         const responseMessage = error.response?.data?.message
@@ -66,19 +66,18 @@ export default function SignInPage() {
         <section className="hidden rounded-2xl border bg-gradient-to-br from-primary/15 to-background p-8 md:block">
           <p className="text-muted-foreground text-sm">Welcome back</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            Sign in to continue to your dashboard
+            Sign in to continue to your investor dashboard
           </h1>
           <p className="text-muted-foreground mt-3 max-w-md text-sm leading-relaxed">
-            Manage panels, track team check-ins, and keep operations running from
-            one place.
+            Track portfolio health, watch performance shifts, and review investor activity in one place.
           </p>
         </section>
 
         <Card className="w-full self-center">
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
+            <CardTitle>Investor Sign in</CardTitle>
             <CardDescription>
-              Use your account credentials to access Panels.
+              Use your investor credentials to access this panel.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -91,7 +90,7 @@ export default function SignInPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="admin"
+                  placeholder="investor_user"
                   required
                 />
               </div>
@@ -119,18 +118,12 @@ export default function SignInPage() {
               </Button>
             </form>
 
-            <div className="space-y-2">
-              <Button variant="link" className="h-auto px-0 text-sm" type="button">
-                Forgot password?
-              </Button>
-            </div>
-
             <Separator />
 
             <p className="text-muted-foreground text-center text-sm">
-              Need a dashboard preview?{" "}
-              <Link href="/" className="text-primary font-medium">
-                Go to Home
+              Need the admin panel?{" "}
+              <Link href="/admin/signin" className="text-primary font-medium">
+                Go to Admin Sign In
               </Link>
             </p>
           </CardContent>
