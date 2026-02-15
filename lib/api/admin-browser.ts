@@ -74,6 +74,14 @@ export type AdminUserDetails = {
   spotify: Record<string, unknown>[]
 }
 
+export type AdminCreateUserRequest = {
+  name: string
+  number: string
+  country_code: string
+  timezone: string
+  created_at: string
+}
+
 export type AdminPromptTableRow = {
   id: string
   name: string
@@ -719,6 +727,21 @@ export const adminUsersApi = {
         return normalizeUsersPayload(response.data)
       },
     })
+  },
+  async create(data: AdminCreateUserRequest): Promise<AdminUser> {
+    const body = adminSchemas.AdminCreateUserRequest.parse(data)
+    const response = await adminAxios.post<unknown>("/admin/users/create", body)
+    const payload =
+      isRecord(response.data) && isRecord(response.data.user)
+        ? response.data.user
+        : response.data
+    const user = coerceAdminUser(payload)
+    if (!user) {
+      throw new Error("Invalid admin user create response payload.")
+    }
+
+    clearCachedRequest("admin-users:list")
+    return user
   },
   async getById(id: string): Promise<AdminUserDetails> {
     return memoizedRequest({
