@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { PanelLogoutButton } from "@/components/panel-logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 
@@ -18,7 +19,10 @@ export function InvestorHeader() {
             <Link href="/admin">Admin</Link>
           </Button>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <PanelLogoutButton panel="investor" />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   )
