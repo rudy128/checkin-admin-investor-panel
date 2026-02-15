@@ -65,6 +65,12 @@ export type InvestorSchemaResponse = {
   tables: InvestorSchemaTable[]
 }
 
+export type InvestorStatsResponse = {
+  total_users: number
+  active_users: number
+  line_chart: Record<string, number>
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -168,9 +174,49 @@ function normalizeSchemaPayload(payload: unknown): InvestorSchemaResponse {
   }
 }
 
+function normalizeStatsPayload(payload: unknown): InvestorStatsResponse {
+  if (!isRecord(payload)) {
+    throw new Error("Invalid investor stats response payload.")
+  }
+
+  const totalUsers = coerceIntegerOrNull(payload.total_users ?? payload.totalUsers)
+  const activeUsers = coerceIntegerOrNull(payload.active_users ?? payload.activeUsers)
+  const lineChartRaw = isRecord(payload.line_chart)
+    ? payload.line_chart
+    : isRecord(payload.lineChart)
+      ? payload.lineChart
+      : null
+
+  if (totalUsers === null || activeUsers === null || !lineChartRaw) {
+    throw new Error("Invalid investor stats response payload.")
+  }
+
+  const lineChart: Record<string, number> = {}
+  for (const [label, value] of Object.entries(lineChartRaw)) {
+    const count = coerceIntegerOrNull(value)
+    if (count === null) {
+      continue
+    }
+    lineChart[label] = count
+  }
+
+  return {
+    total_users: totalUsers,
+    active_users: activeUsers,
+    line_chart: lineChart,
+  }
+}
+
 export const investorSchemaApi = {
   async get(): Promise<InvestorSchemaResponse> {
     const response = await investorAxios.get<unknown>("/investor/schema")
     return normalizeSchemaPayload(response.data)
+  },
+}
+
+export const investorStatsApi = {
+  async get(): Promise<InvestorStatsResponse> {
+    const response = await investorAxios.get<unknown>("/investor/stats")
+    return normalizeStatsPayload(response.data)
   },
 }
