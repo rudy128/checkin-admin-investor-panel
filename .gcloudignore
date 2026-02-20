@@ -1,0 +1,14 @@
+# Cloud Build / Cloud Run source deployment ignore rules.
+# Keep default excludes and import .gitignore patterns.
+.gcloudignore
+.git
+.gitignore
+
+#!include:.gitignore
+
+# Explicitly include local runtime env file for this deployment flow.
+!.env
+
+# Explicitly include generated API types.
+!types/generated
+!types/generated/**

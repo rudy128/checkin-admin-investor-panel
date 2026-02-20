@@ -86,6 +86,8 @@ export type AdminPromptTableRow = {
   id: string
   name: string
   prompt: string
+  category?: "health" | "location" | "spotify"
+  prompt_scope: "card_generation" | "emotion_generation"
   created_at: string
   updated_at: string
   is_active: boolean
@@ -94,6 +96,8 @@ export type AdminPromptTableRow = {
 export type AdminPromptUpsertRequest = {
   name: string
   prompt: string
+  category?: "health" | "location" | "spotify"
+  prompt_scope: "card_generation" | "emotion_generation"
 }
 
 export type AdminPromptMutationResponse = {
@@ -149,6 +153,11 @@ export type AdminSchedulerUpdateRequest = {
   skip_inactive_days: number
 }
 
+export type AdminSchedulerStartRequest = {
+  job_name: "card_generation" | "emotion_generation"
+  user_ids: string[]
+}
+
 export type AdminSchedulerMutationResponse = {
   message: string
   configuration: AdminSchedulerConfigRow
@@ -157,6 +166,9 @@ export type AdminSchedulerMutationResponse = {
 export type AdminSchedulerStartResponse = {
   message: string
   triggered_at: string
+  tick_accepted: boolean
+  requested_job_name: "card_generation" | "emotion_generation"
+  requested_user_ids: string[]
 }
 
 const REQUEST_CACHE_TTL_MS = 10_000
@@ -241,6 +253,13 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
   const id = value.id
   const name = value.name
   const prompt = value.prompt
+  const categoryRaw = value.category
+  const promptScopeRaw =
+    typeof value.prompt_scope === "string"
+      ? value.prompt_scope
+      : typeof value.promptScope === "string"
+        ? value.promptScope
+        : null
   const createdAtRaw =
     typeof value.created_at === "string"
       ? value.created_at
@@ -259,15 +278,27 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
       : typeof value.isActive === "boolean"
         ? value.isActive
         : null
+  const category =
+    categoryRaw === "health" || categoryRaw === "location" || categoryRaw === "spotify"
+      ? categoryRaw
+      : undefined
+  const promptScope =
+    promptScopeRaw === "card_generation" || promptScopeRaw === "emotion_generation"
+      ? promptScopeRaw
+      : null
 
   if (
     typeof id !== "string" ||
     typeof name !== "string" ||
     typeof prompt !== "string" ||
+    promptScope === null ||
     typeof createdAtRaw !== "string" ||
     typeof updatedAtRaw !== "string" ||
     typeof isActiveRaw !== "boolean"
   ) {
+    return null
+  }
+  if (promptScope === "card_generation" && category === undefined) {
     return null
   }
 
@@ -275,6 +306,8 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
     id,
     name,
     prompt,
+    category,
+    prompt_scope: promptScope,
     created_at: createdAtRaw,
     updated_at: updatedAtRaw,
     is_active: isActiveRaw,
@@ -317,6 +350,34 @@ function normalizePromptMutationPayload(payload: unknown): AdminPromptMutationRe
   return {
     message: typeof payload.message === "string" ? payload.message : "",
     prompt,
+  }
+}
+
+function normalizePromptUpsertPayload(
+  data: AdminPromptUpsertRequest
+): AdminPromptUpsertRequest {
+  const promptScope = data.prompt_scope
+
+  if (promptScope === "card_generation") {
+    if (
+      data.category !== "health" &&
+      data.category !== "location" &&
+      data.category !== "spotify"
+    ) {
+      throw new Error("Category is required when prompt scope is card_generation.")
+    }
+    return {
+      name: data.name,
+      prompt: data.prompt,
+      prompt_scope: promptScope,
+      category: data.category,
+    }
+  }
+
+  return {
+    name: data.name,
+    prompt: data.prompt,
+    prompt_scope: promptScope,
   }
 }
 
@@ -581,14 +642,39 @@ function normalizeSchedulerStartPayload(payload: unknown): AdminSchedulerStartRe
       : typeof payload.triggeredAt === "string"
         ? payload.triggeredAt
         : null
+  const tickAccepted =
+    typeof payload.tick_accepted === "boolean"
+      ? payload.tick_accepted
+      : typeof payload.tickAccepted === "boolean"
+        ? payload.tickAccepted
+        : false
+  const requestedJobNameRaw =
+    typeof payload.requested_job_name === "string"
+      ? payload.requested_job_name
+      : typeof payload.requestedJobName === "string"
+        ? payload.requestedJobName
+        : null
+  const requestedJobName =
+    requestedJobNameRaw === "card_generation" || requestedJobNameRaw === "emotion_generation"
+      ? requestedJobNameRaw
+      : null
+  const requestedUserIdsRaw =
+    Array.isArray(payload.requested_user_ids) && payload.requested_user_ids.every((value) => typeof value === "string")
+      ? payload.requested_user_ids
+      : Array.isArray(payload.requestedUserIds) && payload.requestedUserIds.every((value) => typeof value === "string")
+        ? payload.requestedUserIds
+        : null
 
-  if (!triggeredAt) {
+  if (!triggeredAt || requestedJobName === null || requestedUserIdsRaw === null) {
     throw new Error("Invalid scheduler start response payload.")
   }
 
   return {
     message,
     triggered_at: triggeredAt,
+    tick_accepted: tickAccepted,
+    requested_job_name: requestedJobName,
+    requested_user_ids: requestedUserIdsRaw,
   }
 }
 
@@ -787,7 +873,9 @@ export const adminPromptsApi = {
     })
   },
   async create(data: AdminPromptUpsertRequest): Promise<AdminPromptMutationResponse> {
-    const body = adminSchemas.AdminPromptUpsertRequest.parse(data)
+    const body = adminSchemas.AdminPromptUpsertRequest.parse(
+      normalizePromptUpsertPayload(data)
+    )
     const response = await adminAxios.post<unknown>("/admin/prompts/create", body)
     const parsed = normalizePromptMutationPayload(response.data)
     clearCachedRequest("admin-prompts:list")
@@ -797,7 +885,9 @@ export const adminPromptsApi = {
     id: string,
     data: AdminPromptUpsertRequest
   ): Promise<AdminPromptMutationResponse> {
-    const body = adminSchemas.AdminPromptUpsertRequest.parse(data)
+    const body = adminSchemas.AdminPromptUpsertRequest.parse(
+      normalizePromptUpsertPayload(data)
+    )
     const response = await adminAxios.put<unknown>(`/admin/prompts/${id}`, body)
     const parsed = normalizePromptMutationPayload(response.data)
     clearCachedRequest("admin-prompts:list")
@@ -826,9 +916,19 @@ export const adminSchedulerApi = {
       },
     })
   },
-  async start(): Promise<AdminSchedulerStartResponse> {
-    const response = await adminAxios.get<unknown>("/admin/scheduler/start")
-    const normalized = normalizeSchedulerStartPayload(response.data)
+  async start(data: AdminSchedulerStartRequest): Promise<AdminSchedulerStartResponse> {
+    const sanitizedUserIds = Array.isArray(data.user_ids)
+      ? data.user_ids
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter((value) => value.length > 0)
+      : []
+    const body = adminSchemas.AdminSchedulerStartRequest.parse({
+      job_name: data.job_name,
+      user_ids: sanitizedUserIds,
+    })
+    const response = await adminAxios.post<unknown>("/admin/scheduler/start", body)
+    const responseData = response.data
+    const normalized = normalizeSchedulerStartPayload(responseData)
     const parsed = adminSchemas.AdminSchedulerStartResponse.safeParse(normalized)
     clearCachedRequest("admin-scheduler:list")
     return parsed.success ? (parsed.data as AdminSchedulerStartResponse) : normalized

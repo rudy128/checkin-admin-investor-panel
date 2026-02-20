@@ -28,7 +28,30 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+
+const PROMPT_CATEGORIES = [
+  { value: "health", label: "Health" },
+  { value: "location", label: "Location" },
+  { value: "spotify", label: "Spotify" },
+] as const
+
+const PROMPT_SCOPES = [
+  { value: "card_generation", label: "Card Generation" },
+  { value: "emotion_generation", label: "Emotion Generation" },
+] as const
+
+type PromptScope = AdminPromptUpsertRequest["prompt_scope"]
+type PromptCategory = NonNullable<AdminPromptUpsertRequest["category"]>
 
 function formatDate(value: string) {
   const date = new Date(value)
@@ -37,6 +60,30 @@ function formatDate(value: string) {
   }
 
   return date.toLocaleString()
+}
+
+function buildPromptPayload({
+  name,
+  prompt,
+  promptScope,
+  category,
+}: {
+  name: string
+  prompt: string
+  promptScope: PromptScope
+  category: PromptCategory
+}): AdminPromptUpsertRequest {
+  const payload: AdminPromptUpsertRequest = {
+    name: name.trim(),
+    prompt: prompt.trim(),
+    prompt_scope: promptScope,
+  }
+
+  if (promptScope === "card_generation") {
+    payload.category = category
+  }
+
+  return payload
 }
 
 export default function PromptsPage() {
@@ -48,11 +95,15 @@ export default function PromptsPage() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
   const [createPrompt, setCreatePrompt] = React.useState("")
+  const [createCategory, setCreateCategory] = React.useState<PromptCategory>("health")
+  const [createPromptScope, setCreatePromptScope] = React.useState<PromptScope>("card_generation")
   const [creating, setCreating] = React.useState(false)
 
   const [editingPrompt, setEditingPrompt] = React.useState<AdminPromptTableRow | null>(null)
   const [editName, setEditName] = React.useState("")
   const [editPrompt, setEditPrompt] = React.useState("")
+  const [editCategory, setEditCategory] = React.useState<PromptCategory>("health")
+  const [editPromptScope, setEditPromptScope] = React.useState<PromptScope>("card_generation")
   const [savingId, setSavingId] = React.useState<string | null>(null)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
@@ -87,14 +138,18 @@ export default function PromptsPage() {
     setError("")
 
     try {
-      const payload: AdminPromptUpsertRequest = {
+      const payload = buildPromptPayload({
         name: createName,
         prompt: createPrompt,
-      }
+        promptScope: createPromptScope,
+        category: createCategory,
+      })
       const result = await adminPromptsApi.create(payload)
       toast.success(result.message || "Prompt created.")
       setCreateName("")
       setCreatePrompt("")
+      setCreateCategory("health")
+      setCreatePromptScope("card_generation")
       setCreateOpen(false)
       await loadPrompts(true)
     } catch {
@@ -109,6 +164,8 @@ export default function PromptsPage() {
     setEditingPrompt(prompt)
     setEditName(prompt.name)
     setEditPrompt(prompt.prompt)
+    setEditCategory(prompt.category ?? "health")
+    setEditPromptScope(prompt.prompt_scope)
     setError("")
   }
 
@@ -122,10 +179,12 @@ export default function PromptsPage() {
     setError("")
 
     try {
-      const payload: AdminPromptUpsertRequest = {
+      const payload = buildPromptPayload({
         name: editName,
         prompt: editPrompt,
-      }
+        promptScope: editPromptScope,
+        category: editCategory,
+      })
       const result = await adminPromptsApi.update(editingPrompt.id, payload)
       toast.success(result.message || "Prompt updated.")
       setEditingPrompt(null)
@@ -204,6 +263,51 @@ export default function PromptsPage() {
                     placeholder="Prompt name"
                     required
                   />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="create-prompt-scope">Prompt Scope</Label>
+                    <Select
+                      value={createPromptScope}
+                      onValueChange={(value) => setCreatePromptScope(value as PromptScope)}
+                    >
+                      <SelectTrigger id="create-prompt-scope" className="w-full">
+                        <SelectValue placeholder="Select prompt scope" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {PROMPT_SCOPES.map((scope) => (
+                            <SelectItem key={scope.value} value={scope.value}>
+                              {scope.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {createPromptScope === "card_generation" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="create-prompt-category">Category</Label>
+                      <Select
+                        value={createCategory}
+                        onValueChange={(value) => setCreateCategory(value as PromptCategory)}
+                      >
+                        <SelectTrigger id="create-prompt-category" className="w-full">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {PROMPT_CATEGORIES.map((category) => (
+                              <SelectItem key={category.value} value={category.value}>
+                                {category.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <Textarea
                     value={createPrompt}
                     onChange={(event) => setCreatePrompt(event.target.value)}
@@ -252,10 +356,7 @@ export default function PromptsPage() {
             return (
               <Card
                 key={prompt.id}
-                className={cn(
-                  "h-[270px]",
-                  !prompt.is_active && "opacity-60"
-                )}
+                className={cn("h-[270px]", !prompt.is_active && "opacity-60")}
               >
                 <CardHeader className="pb-2">
                   <div className="flex min-w-0 items-start gap-2">
@@ -296,9 +397,15 @@ export default function PromptsPage() {
                 </CardContent>
 
                 <CardFooter className="text-muted-foreground justify-start px-4 py-2 text-left text-xs">
-                  <div className="flex w-full items-center justify-start gap-1.5">
-                    <Clock3Icon className="size-3.5" />
-                    <span>{formatDate(prompt.updated_at)}</span>
+                  <div className="flex w-full flex-col items-start gap-1">
+                    <p className="text-[11px] uppercase tracking-wide">
+                      {prompt.category ? `${prompt.category} · ` : ""}
+                      {prompt.prompt_scope}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <Clock3Icon className="size-3.5" />
+                      <span>{formatDate(prompt.updated_at)}</span>
+                    </div>
                   </div>
                 </CardFooter>
               </Card>
@@ -307,7 +414,10 @@ export default function PromptsPage() {
         </div>
       )}
 
-      <AlertDialog open={Boolean(editingPrompt)} onOpenChange={(open) => !open && setEditingPrompt(null)}>
+      <AlertDialog
+        open={Boolean(editingPrompt)}
+        onOpenChange={(open) => !open && setEditingPrompt(null)}
+      >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Edit Prompt</AlertDialogTitle>
@@ -323,6 +433,51 @@ export default function PromptsPage() {
               placeholder="Prompt name"
               required
             />
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-prompt-scope">Prompt Scope</Label>
+              <Select
+                value={editPromptScope}
+                onValueChange={(value) => setEditPromptScope(value as PromptScope)}
+              >
+                <SelectTrigger id="edit-prompt-scope" className="w-full">
+                  <SelectValue placeholder="Select prompt scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {PROMPT_SCOPES.map((scope) => (
+                      <SelectItem key={scope.value} value={scope.value}>
+                        {scope.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {editPromptScope === "card_generation" && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-prompt-category">Category</Label>
+                <Select
+                  value={editCategory}
+                  onValueChange={(value) => setEditCategory(value as PromptCategory)}
+                >
+                  <SelectTrigger id="edit-prompt-category" className="w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {PROMPT_CATEGORIES.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Textarea
               value={editPrompt}
               onChange={(event) => setEditPrompt(event.target.value)}

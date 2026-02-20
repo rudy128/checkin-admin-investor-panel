@@ -14,6 +14,7 @@ import {
   adminSchedulerApi,
   type AdminSchedulerConfigRow,
   type AdminSchedulerLogRow,
+  type AdminSchedulerStartRequest,
   type AdminSchedulerUpdateRequest,
 } from "@/lib/api/admin-browser"
 import {
@@ -27,6 +28,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
 type SchedulerEditForm = {
@@ -111,6 +120,34 @@ function parseIntegerField(value: string, label: string): number {
   return parsed
 }
 
+function parseStartUserIds(input: string): string[] {
+  const trimmed = input.trim()
+  if (!trimmed) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (Array.isArray(parsed) && parsed.every((value) => typeof value === "string")) {
+      return [...new Set(parsed.map((value) => value.trim()).filter((value) => value.length > 0))]
+    }
+  } catch {
+    // Fallback to delimiter parsing.
+  }
+
+  const uniqueUserIds = new Set<string>()
+  const parts = trimmed
+    .split(/[\s,]+/g)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+
+  for (const id of parts) {
+    uniqueUserIds.add(id)
+  }
+
+  return [...uniqueUserIds]
+}
+
 export default function SchedulerPage() {
   const [configuration, setConfiguration] = React.useState<AdminSchedulerConfigRow[]>([])
   const [logs, setLogs] = React.useState<AdminSchedulerLogRow[]>([])
@@ -118,6 +155,10 @@ export default function SchedulerPage() {
   const [refreshing, setRefreshing] = React.useState(false)
   const [starting, setStarting] = React.useState(false)
   const [error, setError] = React.useState("")
+  const [startDialogOpen, setStartDialogOpen] = React.useState(false)
+  const [startJobName, setStartJobName] =
+    React.useState<AdminSchedulerStartRequest["job_name"]>("emotion_generation")
+  const [startUserIdsInput, setStartUserIdsInput] = React.useState("")
 
   const [editingConfig, setEditingConfig] = React.useState<AdminSchedulerConfigRow | null>(null)
   const [editForm, setEditForm] = React.useState<SchedulerEditForm | null>(null)
@@ -150,14 +191,27 @@ export default function SchedulerPage() {
     void loadScheduler()
   }, [loadScheduler])
 
-  async function onStartScheduler() {
+  async function onStartScheduler(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const userIds = parseStartUserIds(startUserIdsInput)
+    if (userIds.length === 0) {
+      toast.error("At least one user ID is required.")
+      return
+    }
+
     setStarting(true)
     setError("")
 
     try {
-      const response = await adminSchedulerApi.start()
+      const response = await adminSchedulerApi.start({
+        job_name: startJobName,
+        user_ids: userIds,
+      })
       const message = response.message || "Scheduler triggered."
       toast.success(`${message} ${formatDate(response.triggered_at)}`)
+      setStartDialogOpen(false)
+      setStartJobName("emotion_generation")
+      setStartUserIdsInput("")
       await loadScheduler(true)
     } catch {
       setError("Failed to trigger scheduler.")
@@ -239,7 +293,7 @@ export default function SchedulerPage() {
               )}
               Refresh
             </Button>
-            <Button size="sm" onClick={() => void onStartScheduler()} disabled={starting}>
+            <Button size="sm" onClick={() => setStartDialogOpen(true)} disabled={starting}>
               {starting ? (
                 <LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
               ) : (
@@ -369,6 +423,69 @@ export default function SchedulerPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog
+        open={startDialogOpen}
+        onOpenChange={(open) => {
+          if (starting) {
+            return
+          }
+          setStartDialogOpen(open)
+          if (!open) {
+            setStartJobName("emotion_generation")
+            setStartUserIdsInput("")
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run Scheduler</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a job and provide one or more user IDs for `/admin/scheduler/start`.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <form className="space-y-3" onSubmit={onStartScheduler}>
+            <Select
+              value={startJobName}
+              onValueChange={(value) =>
+                setStartJobName(value as AdminSchedulerStartRequest["job_name"])
+              }
+              disabled={starting}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select scheduler job" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="card_generation">Card Generation</SelectItem>
+                  <SelectItem value="emotion_generation">Emotion Generation</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+
+            <Textarea
+              value={startUserIdsInput}
+              onChange={(event) => setStartUserIdsInput(event.target.value)}
+              placeholder="Enter UUIDs separated by commas, spaces, or new lines"
+              rows={4}
+              autoFocus
+              required
+              disabled={starting}
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={starting} onClick={() => setStartDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={starting}>
+                {starting && <LoaderCircleIcon data-icon="inline-start" className="animate-spin" />}
+                Run
+              </Button>
+            </div>
+          </form>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={Boolean(editingConfig)}
@@ -529,4 +646,3 @@ export default function SchedulerPage() {
     </div>
   )
 }
-
