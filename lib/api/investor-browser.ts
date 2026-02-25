@@ -3,7 +3,6 @@
 import axios from "axios"
 
 import { API_URL } from "@/config/api"
-import { createInvestorAuthApiClient } from "@/lib/api/investor-auth"
 
 function resolveApiUrl() {
   if (!API_URL) {
@@ -16,7 +15,6 @@ function resolveApiUrl() {
 }
 
 const baseURL = resolveApiUrl()
-let currentAuthToken: string | null = null
 
 export const investorAxios = axios.create({
   baseURL,
@@ -24,23 +22,6 @@ export const investorAxios = axios.create({
   headers: {
     Accept: "application/json",
   },
-})
-
-investorAxios.interceptors.request.use((config) => {
-  if (currentAuthToken) {
-    config.headers = config.headers || {}
-    config.headers.Authorization = `Bearer ${currentAuthToken}`
-  }
-
-  return config
-})
-
-export function setInvestorAuthToken(token: string | null) {
-  currentAuthToken = token
-}
-
-export const investorAuthApi = createInvestorAuthApiClient(baseURL, {
-  axiosInstance: investorAxios,
 })
 
 export type InvestorSchemaColumn = {

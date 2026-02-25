@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   {
-    href: "/investor",
+    href: "/",
     label: "Dashboard",
     icon: LayoutDashboardIcon,
   },
   {
-    href: "/investor/schema",
+    href: "/table-schema",
     label: "Table Schema",
     icon: DatabaseIcon,
   },
@@ -28,8 +28,8 @@ export function InvestorSidebar() {
         <nav className="flex flex-col gap-1 p-3">
           {navItems.map((item) => {
             const active =
-              item.href === "/investor"
-                ? pathname === "/investor"
+              item.href === "/"
+                ? pathname === "/"
                 : pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link
@@ -52,8 +52,8 @@ export function InvestorSidebar() {
         <nav className="flex gap-2 overflow-x-auto">
           {navItems.map((item) => {
             const active =
-              item.href === "/investor"
-                ? pathname === "/investor"
+              item.href === "/"
+                ? pathname === "/"
                 : pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link

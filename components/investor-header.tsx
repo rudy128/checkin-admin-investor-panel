@@ -1,6 +1,5 @@
 import Link from "next/link"
 
-import { PanelLogoutButton } from "@/components/panel-logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 
@@ -10,17 +9,19 @@ export function InvestorHeader() {
       <div className="flex h-14 w-full items-center justify-between gap-3 px-4 md:px-6">
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
-            <Link href="/investor">Investor</Link>
+            <Link href="/">Investor Dashboard</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/investor/signin">Sign In</Link>
+            <Link href="/table-schema">Table Schema</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href="/admin">Admin</Link>
           </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/admin/signin">Admin Login</Link>
+          </Button>
         </div>
         <div className="flex items-center gap-2">
-          <PanelLogoutButton panel="investor" />
           <ThemeToggle />
         </div>
       </div>

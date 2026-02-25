@@ -16,11 +16,11 @@ export function AppHeader() {
             <Link href="/admin">Admin</Link>
           </Button>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/admin/signin">Sign In</Link>
+            <Link href="/admin/signin">Login</Link>
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <PanelLogoutButton panel="admin" />
+          <PanelLogoutButton />
           <ThemeToggle />
         </div>
       </div>
