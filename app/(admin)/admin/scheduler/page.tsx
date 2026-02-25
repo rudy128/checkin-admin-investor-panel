@@ -462,6 +462,7 @@ export default function SchedulerPage() {
                 <SelectGroup>
                   <SelectItem value="card_generation">Card Generation</SelectItem>
                   <SelectItem value="emotion_generation">Emotion Generation</SelectItem>
+                  <SelectItem value="map_card_generation">Map Card Generation</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>

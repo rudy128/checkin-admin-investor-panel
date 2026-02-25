@@ -104,7 +104,7 @@ export type AdminPromptTableRow = {
   id: string
   name: string
   prompt: string
-  category?: AdminPromptCategory
+  category: AdminPromptCategory
   prompt_scope: "card_generation" | "emotion_generation"
   created_at: string
   updated_at: string
@@ -174,7 +174,7 @@ export type AdminSchedulerUpdateRequest = {
 }
 
 export type AdminSchedulerStartRequest = {
-  job_name: "card_generation" | "emotion_generation"
+  job_name: "card_generation" | "emotion_generation" | "map_card_generation"
   user_ids: string[]
 }
 
@@ -187,7 +187,7 @@ export type AdminSchedulerStartResponse = {
   message: string
   triggered_at: string
   tick_accepted: boolean
-  requested_job_name: "card_generation" | "emotion_generation"
+  requested_job_name: "card_generation" | "emotion_generation" | "map_card_generation"
   requested_user_ids: string[]
 }
 
@@ -321,7 +321,7 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
   const category =
     categoryRaw === "health" || categoryRaw === "location" || categoryRaw === "spotify"
       ? categoryRaw
-      : undefined
+      : null
   const promptScope =
     promptScopeRaw === "card_generation" || promptScopeRaw === "emotion_generation"
       ? promptScopeRaw
@@ -331,14 +331,12 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
     typeof id !== "string" ||
     typeof name !== "string" ||
     typeof prompt !== "string" ||
+    category === null ||
     promptScope === null ||
     typeof createdAtRaw !== "string" ||
     typeof updatedAtRaw !== "string" ||
     typeof isActiveRaw !== "boolean"
   ) {
-    return null
-  }
-  if (promptScope === "card_generation" && category === undefined) {
     return null
   }
 
@@ -695,7 +693,9 @@ function normalizeSchedulerStartPayload(payload: unknown): AdminSchedulerStartRe
         ? payload.requestedJobName
         : null
   const requestedJobName =
-    requestedJobNameRaw === "card_generation" || requestedJobNameRaw === "emotion_generation"
+    requestedJobNameRaw === "card_generation" ||
+    requestedJobNameRaw === "emotion_generation" ||
+    requestedJobNameRaw === "map_card_generation"
       ? requestedJobNameRaw
       : null
   const requestedUserIdsRaw =
@@ -968,10 +968,10 @@ export const adminSchedulerApi = {
           .map((value) => (typeof value === "string" ? value.trim() : ""))
           .filter((value) => value.length > 0)
       : []
-    const body: AdminSchedulerStartRequest = {
+    const body = adminSchemas.AdminSchedulerStartRequest.parse({
       job_name: data.job_name,
       user_ids: sanitizedUserIds,
-    }
+    })
     const response = await adminAxios.post<unknown>("/admin/scheduler/start", body)
     const responseData = response.data
     const normalized = normalizeSchedulerStartPayload(responseData)

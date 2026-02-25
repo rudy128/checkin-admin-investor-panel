@@ -174,7 +174,7 @@ export default function PromptsPage() {
     setEditingPrompt(prompt)
     setEditName(prompt.name)
     setEditPrompt(prompt.prompt)
-    setEditCategory(prompt.category ?? "health")
+    setEditCategory(prompt.category)
     setEditPromptScope(prompt.prompt_scope)
     setError("")
   }
@@ -430,8 +430,7 @@ export default function PromptsPage() {
                 <CardFooter className="text-muted-foreground justify-start px-4 py-2 text-left text-xs">
                   <div className="flex w-full flex-col items-start gap-1">
                     <p className="text-[11px] uppercase tracking-wide">
-                      {prompt.category ? `${prompt.category} · ` : ""}
-                      {prompt.prompt_scope}
+                      {`${prompt.category} · ${prompt.prompt_scope}`}
                     </p>
                     <div className="flex items-center gap-1.5">
                       <Clock3Icon className="size-3.5" />
