@@ -66,6 +66,7 @@ export type AdminUser = {
 export type AdminUserDetails = {
   user: AdminUser
   cards: Record<string, unknown>[]
+  generatedCards: AdminGeneratedCardDetails[]
   emotionalTimeline: Record<string, unknown>[]
   followRequest: Record<string, unknown>[]
   followers: Record<string, unknown>[]
@@ -82,21 +83,40 @@ export type AdminCreateUserRequest = {
   created_at: string
 }
 
+export type AdminGeneratedCardDetails = {
+  id: string
+  user_id: string
+  card_type: string | null
+  title: string | null
+  subtitle: string | null
+  summary: string | null
+  ai_insights: string | null
+  ai_confidence: number | null
+  health_data: Record<string, unknown> | null
+  location_data: Record<string, unknown> | null
+  spotify_data: Record<string, unknown> | null
+  html_content: string | null
+  created_at: string
+  [key: string]: unknown
+}
+
 export type AdminPromptTableRow = {
   id: string
   name: string
   prompt: string
-  category?: "health" | "location" | "spotify"
+  category?: AdminPromptCategory
   prompt_scope: "card_generation" | "emotion_generation"
   created_at: string
   updated_at: string
   is_active: boolean
 }
 
+export type AdminPromptCategory = "health" | "location" | "spotify"
+
 export type AdminPromptUpsertRequest = {
   name: string
   prompt: string
-  category?: "health" | "location" | "spotify"
+  category?: AdminPromptCategory
   prompt_scope: "card_generation" | "emotion_generation"
 }
 
@@ -245,6 +265,21 @@ function toRecordArray(value: unknown): Record<string, unknown>[] {
   return value.filter((item): item is Record<string, unknown> => isRecord(item))
 }
 
+function toGeneratedCardArray(value: unknown): AdminGeneratedCardDetails[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => {
+      const parsed = adminSchemas.AdminGeneratedCardDetails.safeParse(item)
+      return parsed.success
+        ? (parsed.data as AdminGeneratedCardDetails)
+        : (item as AdminGeneratedCardDetails)
+    })
+}
+
 function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
   if (!isRecord(value)) {
     return null
@@ -253,7 +288,12 @@ function coerceAdminPromptRow(value: unknown): AdminPromptTableRow | null {
   const id = value.id
   const name = value.name
   const prompt = value.prompt
-  const categoryRaw = value.category
+  const categoryRaw =
+    typeof value.category === "string"
+      ? value.category
+      : typeof value.prompt_category === "string"
+        ? value.prompt_category
+        : null
   const promptScopeRaw =
     typeof value.prompt_scope === "string"
       ? value.prompt_scope
@@ -732,6 +772,11 @@ function toAdminUserDetailsSchemaShape(payload: unknown): unknown {
     ...payload,
     user: mappedUser,
     cards: Array.isArray(payload.cards) ? payload.cards : [],
+    generated_cards: Array.isArray(payload.generated_cards)
+      ? payload.generated_cards
+      : Array.isArray(payload.generatedCards)
+        ? payload.generatedCards
+        : [],
     emotional_timeline: Array.isArray(payload.emotional_timeline) ? payload.emotional_timeline : [],
     follow_request: Array.isArray(payload.follow_request) ? payload.follow_request : [],
     followers: Array.isArray(payload.followers) ? payload.followers : [],
@@ -836,11 +881,11 @@ export const adminUsersApi = {
         const response = await adminAxios.get<unknown>(`/admin/user/${id}`)
         const schemaShape = toAdminUserDetailsSchemaShape(response.data)
         const parsed = adminSchemas.AdminUserDetailsResponse.safeParse(schemaShape)
-        if (!parsed.success) {
-          throw new Error("Invalid AdminUserDetailsResponse payload.")
-        }
-
-        const payload = parsed.data
+        const payload = parsed.success
+          ? parsed.data
+          : isRecord(schemaShape)
+            ? schemaShape
+            : {}
         const user = coerceAdminUser(payload.user)
         if (!user) {
           throw new Error("Invalid user payload in AdminUserDetailsResponse.")
@@ -849,6 +894,7 @@ export const adminUsersApi = {
         return {
           user,
           cards: toRecordArray(payload.cards),
+          generatedCards: toGeneratedCardArray(payload.generated_cards ?? payload.generatedCards),
           emotionalTimeline: toRecordArray(payload.emotional_timeline),
           followRequest: toRecordArray(payload.follow_request),
           followers: toRecordArray(payload.followers),
@@ -922,10 +968,10 @@ export const adminSchedulerApi = {
           .map((value) => (typeof value === "string" ? value.trim() : ""))
           .filter((value) => value.length > 0)
       : []
-    const body = adminSchemas.AdminSchedulerStartRequest.parse({
+    const body: AdminSchedulerStartRequest = {
       job_name: data.job_name,
       user_ids: sanitizedUserIds,
-    })
+    }
     const response = await adminAxios.post<unknown>("/admin/scheduler/start", body)
     const responseData = response.data
     const normalized = normalizeSchedulerStartPayload(responseData)

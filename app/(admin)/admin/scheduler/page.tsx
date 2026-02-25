@@ -299,7 +299,7 @@ export default function SchedulerPage() {
               ) : (
                 <PlayIcon data-icon="inline-start" />
               )}
-              Run Now
+              Start + Run Now
             </Button>
           </div>
         </div>
@@ -314,7 +314,9 @@ export default function SchedulerPage() {
               <CalendarClockIcon className="size-4" />
               Scheduler Configuration
             </CardTitle>
-            <CardDescription>Routes: `/admin/scheduler`, `/admin/scheduler/:id`.</CardDescription>
+            <CardDescription>
+              Routes: `/admin/scheduler`, `/admin/scheduler/start`, `/admin/scheduler/:id`.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (

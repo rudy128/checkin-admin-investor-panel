@@ -12,6 +12,7 @@ import {
 
 import {
   adminPromptsApi,
+  type AdminPromptCategory,
   type AdminPromptTableRow,
   type AdminPromptUpsertRequest,
 } from "@/lib/api/admin-browser"
@@ -52,6 +53,15 @@ const PROMPT_SCOPES = [
 
 type PromptScope = AdminPromptUpsertRequest["prompt_scope"]
 type PromptCategory = NonNullable<AdminPromptUpsertRequest["category"]>
+
+
+function toPromptCategory(value: string): AdminPromptCategory {
+  if (PROMPT_CATEGORIES.some((option) => option.value === value)) {
+    return value as AdminPromptCategory
+  }
+
+  return "health"
+}
 
 function formatDate(value: string) {
   const date = new Date(value)
@@ -308,6 +318,24 @@ export default function PromptsPage() {
                     </div>
                   )}
 
+                  <div className="space-y-2">
+                    <Label htmlFor="create-prompt-category">Category</Label>
+                    <Select
+                      value={createCategory}
+                      onValueChange={(value) => setCreateCategory(toPromptCategory(value))}
+                    >
+                      <SelectTrigger id="create-prompt-category" className="w-full">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROMPT_CATEGORIES.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Textarea
                     value={createPrompt}
                     onChange={(event) => setCreatePrompt(event.target.value)}
@@ -391,6 +419,9 @@ export default function PromptsPage() {
                 </CardHeader>
 
                 <CardContent className="flex-1 overflow-hidden pt-0">
+                  <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+                    {prompt.category}
+                  </p>
                   <p className="text-muted-foreground max-w-full overflow-hidden text-ellipsis whitespace-pre-wrap text-sm leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:8] [overflow-wrap:anywhere]">
                     {prompt.prompt}
                   </p>
@@ -478,6 +509,24 @@ export default function PromptsPage() {
               </div>
             )}
 
+            <div className="space-y-2">
+              <Label htmlFor="edit-prompt-category">Category</Label>
+              <Select
+                value={editCategory}
+                onValueChange={(value) => setEditCategory(toPromptCategory(value))}
+              >
+                <SelectTrigger id="edit-prompt-category" className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROMPT_CATEGORIES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Textarea
               value={editPrompt}
               onChange={(event) => setEditPrompt(event.target.value)}

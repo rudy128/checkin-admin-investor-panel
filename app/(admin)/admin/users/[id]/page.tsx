@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { AxiosError } from "axios"
 import Link from "next/link"
 import { ArrowLeftIcon, LoaderCircleIcon, UserRoundIcon } from "lucide-react"
 import { useParams } from "next/navigation"
@@ -22,12 +23,72 @@ function formatDate(value?: string) {
   return date.toLocaleString()
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getHtmlContent(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const candidates = [value.html_content, value.htmlContent, value.html]
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim() !== "") {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+function stripHtmlContent(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value
+  }
+
+  const rest = { ...value }
+  delete rest.html_content
+  delete rest.htmlContent
+  delete rest.html
+  return rest
+}
+
+function hasRenderableRawPayload(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return true
+  }
+
+  return Object.keys(value).length > 0
+}
+
+function buildHtmlPreviewDocument(htmlContent: string): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; }
+      body {
+        padding: 12px;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.45;
+      }
+      img, video, canvas, svg { max-width: 100%; height: auto; }
+      pre, code { white-space: pre-wrap; word-break: break-word; }
+    </style>
+  </head>
+  <body>${htmlContent}</body>
+</html>`
+}
+
 function DataSection({
   title,
   items,
 }: {
   title: string
-  items: Record<string, unknown>[]
+  items: unknown[]
 }) {
   return (
     <Card>
@@ -41,12 +102,37 @@ function DataSection({
         ) : (
           <div className="space-y-2">
             {items.map((item, index) => (
-              <pre
-                key={`${title}-${index}`}
-                className="bg-muted/40 overflow-x-auto rounded-lg border p-3 text-xs"
-              >
-                {JSON.stringify(item, null, 2)}
-              </pre>
+              <div key={`${title}-${index}`} className="space-y-2">
+                {(() => {
+                  const htmlContent = getHtmlContent(item)
+                  const rawPayload = stripHtmlContent(item)
+                  const showRawPayload = hasRenderableRawPayload(rawPayload)
+
+                  return (
+                    <>
+                      {htmlContent ? (
+                        <div className="overflow-x-auto rounded-lg border p-3">
+                          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+                            Rendered HTML (Isolated)
+                          </p>
+                          <iframe
+                            title={`${title}-${index}-preview`}
+                            className="bg-background h-[560px] w-full rounded-md border"
+                            srcDoc={buildHtmlPreviewDocument(htmlContent)}
+                            sandbox=""
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : null}
+                      {showRawPayload || !htmlContent ? (
+                        <pre className="bg-muted/40 overflow-x-auto rounded-lg border p-3 text-xs">
+                          {JSON.stringify(rawPayload, null, 2)}
+                        </pre>
+                      ) : null}
+                    </>
+                  )
+                })()}
+              </div>
             ))}
           </div>
         )}
@@ -81,9 +167,20 @@ export default function UserDetailsPage() {
         if (active) {
           setDetails(payload)
         }
-      } catch {
+      } catch (errorValue) {
         if (active) {
-          setError("Failed to load user details.")
+          let message = "Failed to load user details."
+
+          if (errorValue instanceof AxiosError) {
+            const responseMessage = errorValue.response?.data?.message
+            if (typeof responseMessage === "string" && responseMessage.trim()) {
+              message = responseMessage
+            }
+          } else if (errorValue instanceof Error && errorValue.message.trim()) {
+            message = errorValue.message
+          }
+
+          setError(message)
           setDetails(null)
         }
       } finally {
@@ -177,6 +274,7 @@ export default function UserDetailsPage() {
 
           <div className="grid gap-4 xl:grid-cols-2">
             <DataSection title="Cards" items={details.cards} />
+            <DataSection title="Generated Cards" items={details.generatedCards} />
             <DataSection title="Emotional Timeline" items={details.emotionalTimeline} />
             <DataSection title="Follow Request" items={details.followRequest} />
             <DataSection title="Followers" items={details.followers} />
