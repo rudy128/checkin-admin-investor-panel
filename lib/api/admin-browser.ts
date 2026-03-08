@@ -949,6 +949,185 @@ export const adminPromptsApi = {
   },
 }
 
+export type AdminManualCardUser = {
+  id: string
+  name: string | null | undefined
+  image: string | null | undefined
+  country_code: string
+  phone_no: string
+  timezone: string | null | undefined
+  location_permission: string | null | undefined
+  health_permission: string | null | undefined
+  notifications_enabled: boolean
+  created_at: string
+  updated_at: string
+  [key: string]: unknown
+}
+
+export type AdminManualCardUsersResponse = {
+  users: AdminManualCardUser[]
+}
+
+export type AdminManualCardPushRequest = {
+  user_id: string
+  html_content: string
+  card_type?: string
+  title?: string
+  subtitle?: string
+  summary?: string
+  ai_insights?: string
+  ai_confidence?: number
+}
+
+export type AdminManualCardPushResponse = {
+  status: string
+  message: string
+  card_id: string
+}
+
+export type AdminUserCard = {
+  id: string
+  user_id: string
+  card_type: "health" | "spotify" | "location" | "map" | "song" | "custom" | null
+  title: string | null
+  subtitle: string | null
+  summary: string | null
+  ai_insights: string | null
+  html_content: string | null
+  show: boolean
+  created_at: string
+  [key: string]: unknown
+}
+
+export type AdminUserCardsResponse = {
+  cards: AdminUserCard[]
+}
+
+export type AdminNotificationRequest = {
+  title: string
+  body: string
+}
+
+export type AdminNotificationResponse = {
+  status: string
+  message: string
+}
+
+function coerceManualCardUser(value: unknown): AdminManualCardUser | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const id = typeof value.id === "string" ? value.id : null
+  const country_code = typeof value.country_code === "string" ? value.country_code : ""
+  const phone_no = typeof value.phone_no === "string" ? value.phone_no : ""
+  const notifications_enabled = typeof value.notifications_enabled === "boolean" ? value.notifications_enabled : false
+  const created_at = typeof value.created_at === "string" ? value.created_at : ""
+  const updated_at = typeof value.updated_at === "string" ? value.updated_at : ""
+
+  if (!id) {
+    return null
+  }
+
+  return {
+    id,
+    name: typeof value.name === "string" || value.name == null ? value.name : undefined,
+    image: typeof value.image === "string" || value.image == null ? value.image : undefined,
+    country_code,
+    phone_no,
+    timezone: typeof value.timezone === "string" || value.timezone == null ? value.timezone : undefined,
+    location_permission: typeof value.location_permission === "string" || value.location_permission == null ? value.location_permission : undefined,
+    health_permission: typeof value.health_permission === "string" || value.health_permission == null ? value.health_permission : undefined,
+    notifications_enabled,
+    created_at,
+    updated_at,
+    ...value,
+  }
+}
+
+function normalizeManualCardUsersPayload(payload: unknown): AdminManualCardUsersResponse {
+  if (isRecord(payload) && Array.isArray(payload.users)) {
+    return {
+      users: payload.users
+        .map((item) => coerceManualCardUser(item))
+        .filter((item): item is AdminManualCardUser => item !== null),
+    }
+  }
+
+  return { users: [] }
+}
+
+export const adminManualCardApi = {
+  async listUsers(force = false): Promise<AdminManualCardUsersResponse> {
+    return memoizedRequest({
+      key: "admin-manual-card:users",
+      force,
+      request: async () => {
+        const response = await adminAxios.get<unknown>("/admin/manual-card")
+        return normalizeManualCardUsersPayload(response.data)
+      },
+    })
+  },
+  async push(data: AdminManualCardPushRequest): Promise<AdminManualCardPushResponse> {
+    const body = adminSchemas.AdminManualCardPushRequest.parse(data)
+    const response = await adminAxios.post<unknown>("/admin/manual-card-push", body)
+    const payload = response.data
+    if (
+      !isRecord(payload) ||
+      typeof payload.status !== "string" ||
+      typeof payload.message !== "string" ||
+      typeof payload.card_id !== "string"
+    ) {
+      throw new Error("Invalid manual card push response payload.")
+    }
+
+    return {
+      status: payload.status,
+      message: payload.message,
+      card_id: payload.card_id,
+    }
+  },
+  async getUserCards(userId: string, force = false): Promise<AdminUserCardsResponse> {
+    return memoizedRequest({
+      key: `admin-manual-card:user-cards:${userId}`,
+      force,
+      request: async () => {
+        const response = await adminAxios.get<unknown>(`/admin/cards/${userId}`)
+        const payload = response.data
+        if (!isRecord(payload) || !Array.isArray(payload.cards)) {
+          return { cards: [] }
+        }
+        const cards = payload.cards
+          .map((item) => {
+            if (!isRecord(item)) return null
+            const parsed = adminSchemas.AdminUserCardsResponse.shape.cards.element.safeParse(item)
+            return parsed.success ? (parsed.data as AdminUserCard) : null
+          })
+          .filter((c): c is AdminUserCard => c !== null)
+        return { cards }
+      },
+    })
+  },
+}
+
+export const adminNotificationApi = {
+  async send(userId: string, data: AdminNotificationRequest): Promise<AdminNotificationResponse> {
+    const body = adminSchemas.AdminNotificationRequest.parse({
+      title: data.title.trim(),
+      body: data.body.trim(),
+    })
+    const response = await adminAxios.post<unknown>(`/admin/notification/${userId}`, body)
+    const payload = response.data
+    if (!isRecord(payload)) {
+      return { status: "unknown", message: "Invalid response" }
+    }
+    return {
+      status: typeof payload.status === "string" ? payload.status : "unknown",
+      message: typeof payload.message === "string" ? payload.message : "No message",
+    }
+  },
+}
+
 export const adminSchedulerApi = {
   async list(force = false): Promise<AdminSchedulerResponse> {
     return memoizedRequest({
