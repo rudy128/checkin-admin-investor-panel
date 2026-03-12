@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { EyeIcon, LoaderCircleIcon, RefreshCwIcon, SendIcon } from "lucide-react"
+import { CalendarIcon, CopyIcon, DatabaseIcon, EyeIcon, LoaderCircleIcon, PaletteIcon, RefreshCwIcon, SendIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -10,6 +10,7 @@ import {
   type AdminManualCardPushRequest,
   type AdminManualCardUser,
   type AdminUserCard,
+  type AdminUserDataResponse,
 } from "@/lib/api/admin-browser"
 import { buildCardHtml, buildParsedCardFromFields } from "@/lib/card-html-builder"
 import {
@@ -19,6 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +40,18 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+type PreviewColorOverride = {
+  accent: string
+  gradient: string
+}
+
+const PREVIEW_COLOR_PRESETS: PreviewColorOverride[] = [
+  { accent: "#2dd4bf", gradient: "linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a4a 100%)" },
+  { accent: "#a78bfa", gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" },
+  { accent: "#34d399", gradient: "linear-gradient(135deg, #0d2818 0%, #1a3d2b 50%, #0f2d1f 100%)" },
+  { accent: "#f472b6", gradient: "linear-gradient(135deg, #2a1a24 0%, #3d1f2e 50%, #2d1520 100%)" },
+]
 
 const CARD_TYPES = [
   { value: "health", label: "Health" },
@@ -56,7 +75,7 @@ type CardForm = {
 
 const EMPTY_FORM: CardForm = {
   user_id: "",
-  card_type: "",
+  card_type: "custom",
   title: "",
   subtitle: "",
   body: "",
@@ -69,7 +88,11 @@ function displayName(user: AdminManualCardUser) {
   return user.name ?? `${user.country_code} ${user.phone_no}`
 }
 
-function buildPreviewHtml(form: CardForm, timezone?: string): string {
+function buildPreviewHtml(
+  form: CardForm,
+  timezone?: string,
+  colorOverride?: PreviewColorOverride | null,
+): string {
   const parsed = buildParsedCardFromFields({
     title: form.title || "Untitled",
     subtitle: form.subtitle || undefined,
@@ -80,27 +103,18 @@ function buildPreviewHtml(form: CardForm, timezone?: string): string {
     label: form.card_type || undefined,
     generatedAt: new Date(),
     timeZone: timezone,
+    overrideAccent: colorOverride?.accent,
+    overrideGradient: colorOverride?.gradient,
   })
 }
 
 // ─── Card Preview iframe ─────────────────────────────────────────────────────
 
-function CardPreview({ html }: { html: string }) {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null)
-
-  React.useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe) return
-    const doc = iframe.contentDocument ?? iframe.contentWindow?.document
-    if (!doc) return
-    doc.open()
-    doc.write(html)
-    doc.close()
-  }, [html])
-
+function CardPreview({ html, colorKey }: { html: string; colorKey: string }) {
   return (
     <iframe
-      ref={iframeRef}
+      key={colorKey}
+      srcDoc={html}
       title="Card Preview"
       className="h-full w-full border-0"
       sandbox="allow-same-origin"
@@ -118,7 +132,6 @@ export default function ManualCardsPage() {
   const [cardsLoading, setCardsLoading] = React.useState(false)
 
   const [form, setForm] = React.useState<CardForm>(EMPTY_FORM)
-  const [previewHtml, setPreviewHtml] = React.useState<string>(() => buildPreviewHtml(EMPTY_FORM))
   const [showPreview, setShowPreview] = React.useState(false)
 
   const [submitting, setSubmitting] = React.useState(false)
@@ -128,6 +141,25 @@ export default function ManualCardsPage() {
   const [notificationTitle, setNotificationTitle] = React.useState("")
   const [notificationBody, setNotificationBody] = React.useState("")
   const [sendingNotification, setSendingNotification] = React.useState(false)
+
+  const [dataChoiceOpen, setDataChoiceOpen] = React.useState(false)
+  const [dataResultOpen, setDataResultOpen] = React.useState(false)
+  const [dataResult, setDataResult] = React.useState<AdminUserDataResponse | null>(null)
+  const [dataResultUserId, setDataResultUserId] = React.useState<string | null>(null)
+  const [previewColorOverride, setPreviewColorOverride] = React.useState<PreviewColorOverride | null>(null)
+  const [colorPickerOpen, setColorPickerOpen] = React.useState(false)
+  const [customAccent, setCustomAccent] = React.useState("#a78bfa")
+
+  React.useEffect(() => {
+    if (colorPickerOpen && previewColorOverride?.accent) {
+      setCustomAccent(previewColorOverride.accent)
+    }
+  }, [colorPickerOpen, previewColorOverride?.accent])
+  const [dataLoading, setDataLoading] = React.useState(false)
+  const [customDateValue, setCustomDateValue] = React.useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+  })
 
   // ── Data fetching ────────────────────────────────────────────────────────
 
@@ -157,10 +189,13 @@ export default function ManualCardsPage() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  React.useEffect(() => {
-    const selectedUser = users.find((u) => u.id === form.user_id)
-    setPreviewHtml(buildPreviewHtml(form, selectedUser?.timezone || undefined))
-  }, [form, users])
+  const previewHtml = React.useMemo(
+    () => {
+      const selectedUser = users.find((u) => u.id === form.user_id)
+      return buildPreviewHtml(form, selectedUser?.timezone || undefined, previewColorOverride)
+    },
+    [form, users, previewColorOverride],
+  )
 
   // Fetch cards when user is selected
   React.useEffect(() => {
@@ -183,10 +218,6 @@ export default function ManualCardsPage() {
 
     if (!form.user_id) {
       toast.error("Please select a user.")
-      return
-    }
-    if (!form.title.trim()) {
-      toast.error("Title is required.")
       return
     }
     if (!form.body.trim()) {
@@ -298,8 +329,58 @@ export default function ManualCardsPage() {
 
   const canSubmit =
     !!form.user_id &&
-    form.title.trim().length > 0 &&
     form.body.trim().length > 0
+
+  async function handleFetchTodayData() {
+    if (!form.user_id) {
+      toast.error("Select a user first.")
+      return
+    }
+    setDataLoading(true)
+    try {
+      const result = await adminManualCardApi.fetchTodayData(form.user_id)
+      setDataResult(result)
+      setDataResultUserId(form.user_id)
+      setDataChoiceOpen(false)
+      setDataResultOpen(true)
+      toast.success("Today data loaded.")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to fetch today data.")
+    } finally {
+      setDataLoading(false)
+    }
+  }
+
+  async function handleFetchCustomData() {
+    if (!form.user_id) {
+      toast.error("Select a user first.")
+      return
+    }
+    const fromDate = new Date(customDateValue)
+    if (Number.isNaN(fromDate.getTime())) {
+      toast.error("Pick a valid date and time.")
+      return
+    }
+    setDataLoading(true)
+    try {
+      const result = await adminManualCardApi.fetchCustomData(form.user_id, fromDate.toISOString())
+      setDataResult(result)
+      setDataResultUserId(form.user_id)
+      setDataChoiceOpen(false)
+      setDataResultOpen(true)
+      toast.success("Custom date data loaded.")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to fetch custom data.")
+    } finally {
+      setDataLoading(false)
+    }
+  }
+
+  function handleCopyData() {
+    if (!dataResult) return
+    const text = JSON.stringify(dataResult, null, 2)
+    void navigator.clipboard.writeText(text).then(() => toast.success("Data copied to clipboard."))
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -313,7 +394,62 @@ export default function ManualCardsPage() {
             Inject a card directly into the database for a specific user.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 border-r pr-2 mr-0.5">
+            {PREVIEW_COLOR_PRESETS.map((preset) => {
+              const isActive = previewColorOverride?.accent === preset.accent
+              return (
+                <button
+                  key={preset.accent}
+                  type="button"
+                  onClick={() => setPreviewColorOverride(preset)}
+                  className={`size-7 rounded-md border-2 transition-all shrink-0 ${
+                    isActive ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-105" : "border-transparent hover:border-muted-foreground/50"
+                  }`}
+                  style={{ backgroundColor: preset.accent }}
+                  title="Preset color"
+                />
+              )
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setColorPickerOpen(true)}
+            title="Pick custom preview color"
+          >
+            <PaletteIcon className="mr-2 size-4" />
+            Preview color
+          </Button>
+          {previewColorOverride && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => setPreviewColorOverride(null)}
+              title="Reset to card theme"
+            >
+              Reset color
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!form.user_id) {
+                toast.error("Select a user first.")
+                return
+              }
+              if (dataResult && dataResultUserId === form.user_id) {
+                setDataResultOpen(true)
+              } else {
+                setDataChoiceOpen(true)
+              }
+            }}
+          >
+            <DatabaseIcon className="mr-2 size-4" />
+            Data
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -403,63 +539,75 @@ export default function ManualCardsPage() {
                 </div>
               )}
 
-              {/* Card Type + Title */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="card_type">Card Type</Label>
-                  <Select
-                    value={form.card_type}
-                    onValueChange={(value) => setField("card_type", value)}
-                  >
-                    <SelectTrigger id="card_type">
-                      <SelectValue placeholder="Select card type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CARD_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="title">
-                    Title <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    placeholder="Card title"
-                    value={form.title}
-                    onChange={(e) => setField("title", e.target.value)}
-                  />
-                </div>
-              </div>
+              {/* Card Metadata Accordion */}
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="metadata">
+                  <AccordionTrigger className="text-sm font-semibold">
+                    Card Metadata
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-5">
+                      {/* Card Type + Title */}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="card_type">Card Type</Label>
+                          <Select
+                            value={form.card_type}
+                            onValueChange={(value) => setField("card_type", value)}
+                          >
+                            <SelectTrigger id="card_type">
+                              <SelectValue placeholder="Select card type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CARD_TYPES.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="title">
+                            Title (optional)
+                          </Label>
+                          <Input
+                            id="title"
+                            placeholder="Card title (optional)"
+                            value={form.title}
+                            onChange={(e) => setField("title", e.target.value)}
+                          />
+                        </div>
+                      </div>
 
-              {/* Subtitle + AI Confidence */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="subtitle">Subtitle</Label>
-                  <Input
-                    id="subtitle"
-                    placeholder="Optional subtitle"
-                    value={form.subtitle}
-                    onChange={(e) => setField("subtitle", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ai_confidence">AI Confidence (0–100)</Label>
-                  <Input
-                    id="ai_confidence"
-                    type="number"
-                    min={0}
-                    max={100}
-                    placeholder="e.g. 85"
-                    value={form.ai_confidence}
-                    onChange={(e) => setField("ai_confidence", e.target.value)}
-                  />
-                </div>
-              </div>
+                      {/* Subtitle + AI Confidence */}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="subtitle">Subtitle</Label>
+                          <Input
+                            id="subtitle"
+                            placeholder="Optional subtitle"
+                            value={form.subtitle}
+                            onChange={(e) => setField("subtitle", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="ai_confidence">AI Confidence (0–100)</Label>
+                          <Input
+                            id="ai_confidence"
+                            type="number"
+                            min={0}
+                            max={100}
+                            placeholder="e.g. 85"
+                            value={form.ai_confidence}
+                            onChange={(e) => setField("ai_confidence", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
 
               {/* Body */}
               <div className="space-y-1.5">
@@ -604,7 +752,7 @@ export default function ManualCardsPage() {
                 <p className="text-muted-foreground text-xs">Updates as you type</p>
               </div>
               <div className="flex-1 overflow-hidden bg-neutral-950">
-                <CardPreview html={previewHtml} />
+                <CardPreview colorKey={previewColorOverride?.accent ?? "default"} html={previewHtml} />
               </div>
             </div>
           )}
@@ -632,6 +780,119 @@ export default function ManualCardsPage() {
           </AlertDialogHeader>
           <div className="flex justify-end pt-2">
             <Button onClick={() => setResultOpen(false)}>Done</Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Color picker modal – pick any color to change preview */}
+      <AlertDialog open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Preview color</AlertDialogTitle>
+            <AlertDialogDescription>
+              Use the color picker below to choose any color. The preview updates as you pick.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <label className="flex flex-col items-center gap-2 cursor-pointer">
+              <input
+                type="color"
+                value={customAccent}
+                onChange={(e) => {
+                  const color = e.target.value
+                  setCustomAccent(color)
+                  setPreviewColorOverride({
+                    accent: color,
+                    gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+                  })
+                }}
+                className="size-20 rounded-lg border-2 border-muted cursor-pointer bg-transparent"
+              />
+              <span className="text-muted-foreground text-sm">Pick a color</span>
+            </label>
+            <Button variant="outline" onClick={() => setColorPickerOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Data choice modal: Today or Custom date */}
+      <AlertDialog open={dataChoiceOpen} onOpenChange={setDataChoiceOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fetch user data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Load health, Spotify, and location data. Today uses the user&apos;s timezone; custom uses a start time until now.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <Button
+              className="w-full justify-start gap-2"
+              variant="outline"
+              onClick={handleFetchTodayData}
+              disabled={dataLoading}
+            >
+              {dataLoading ? <LoaderCircleIcon className="size-4 animate-spin" /> : <CalendarIcon className="size-4" />}
+              Today
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="data-custom-date">Custom date (from this time until now)</Label>
+              <Input
+                id="data-custom-date"
+                type="datetime-local"
+                value={customDateValue}
+                onChange={(e) => setCustomDateValue(e.target.value)}
+                disabled={dataLoading}
+              />
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={handleFetchCustomData}
+                disabled={dataLoading}
+              >
+                {dataLoading ? <LoaderCircleIcon className="mr-2 size-4 animate-spin" /> : null}
+                Fetch from custom date
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setDataChoiceOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Data result modal: show JSON + Copy */}
+      <AlertDialog open={dataResultOpen} onOpenChange={setDataResultOpen}>
+        <AlertDialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              Fetched data (from_timestamp → to_timestamp). Copy to clipboard as JSON.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <pre className="bg-muted rounded-md p-3 text-xs overflow-auto flex-1 min-h-0 border">
+            {dataResult ? JSON.stringify(dataResult, null, 2) : ""}
+          </pre>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button onClick={handleCopyData}>
+              <CopyIcon className="mr-2 size-4" />
+              Copy
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDataResultOpen(false)
+                setDataChoiceOpen(true)
+              }}
+            >
+              Fetch new
+            </Button>
+            <Button variant="outline" onClick={() => setDataResultOpen(false)}>
+              Close
+            </Button>
           </div>
         </AlertDialogContent>
       </AlertDialog>

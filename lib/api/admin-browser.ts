@@ -7,6 +7,7 @@ import { createApiClient as createAdminApiClient } from "@/types/generated/admin
 import { createApiClient as createAdminAuthApiClient } from "@/types/generated/admin/Admin_Auth"
 import { schemas as adminSchemas } from "@/types/generated/admin/Admin"
 
+
 function resolveApiUrl() {
   if (!API_URL) {
     throw new Error("Missing NEXT_PUBLIC_API_URL for browser admin API client.")
@@ -28,10 +29,23 @@ export const adminAxios = axios.create({
   },
 })
 
+function getStoredAdminAuthToken(): string | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  try {
+    return window.localStorage.getItem("admin.auth_token")
+  } catch {
+    return null
+  }
+}
+
 adminAxios.interceptors.request.use((config) => {
-  if (currentAuthToken) {
+  const token = currentAuthToken ?? getStoredAdminAuthToken()
+  if (token) {
     config.headers = config.headers || {}
-    config.headers.Authorization = `Bearer ${currentAuthToken}`
+    config.headers.Authorization = `Bearer ${token}`
   }
 
   return config
@@ -1003,6 +1017,14 @@ export type AdminUserCardsResponse = {
   cards: AdminUserCard[]
 }
 
+export type AdminUserDataResponse = {
+  from_timestamp: string
+  to_timestamp: string
+  spotify: unknown[]
+  location: unknown[]
+  health: unknown[]
+}
+
 export type AdminNotificationRequest = {
   title: string
   body: string
@@ -1107,6 +1129,34 @@ export const adminManualCardApi = {
         return { cards }
       },
     })
+  },
+  /** Fetch today's health, spotify, and location data for a user (today in user's timezone). */
+  async fetchTodayData(userId: string): Promise<AdminUserDataResponse> {
+    const response = await adminAxios.get<unknown>(`/admin/cards/${userId}/today-data`)
+    const payload = response.data
+    if (!isRecord(payload)) throw new Error("Invalid today-data response.")
+    return {
+      from_timestamp: typeof payload.from_timestamp === "string" ? payload.from_timestamp : "",
+      to_timestamp: typeof payload.to_timestamp === "string" ? payload.to_timestamp : "",
+      spotify: Array.isArray(payload.spotify) ? payload.spotify : [],
+      location: Array.isArray(payload.location) ? payload.location : [],
+      health: Array.isArray(payload.health) ? payload.health : [],
+    }
+  },
+  /** Fetch data from a given ISO timestamp until now (spotify, location, health). */
+  async fetchCustomData(userId: string, fromIso: string): Promise<AdminUserDataResponse> {
+    const response = await adminAxios.get<unknown>(`/admin/cards/${userId}/custom-data`, {
+      params: { from: fromIso },
+    })
+    const payload = response.data
+    if (!isRecord(payload)) throw new Error("Invalid custom-data response.")
+    return {
+      from_timestamp: typeof payload.from_timestamp === "string" ? payload.from_timestamp : "",
+      to_timestamp: typeof payload.to_timestamp === "string" ? payload.to_timestamp : "",
+      spotify: Array.isArray(payload.spotify) ? payload.spotify : [],
+      location: Array.isArray(payload.location) ? payload.location : [],
+      health: Array.isArray(payload.health) ? payload.health : [],
+    }
   },
 }
 

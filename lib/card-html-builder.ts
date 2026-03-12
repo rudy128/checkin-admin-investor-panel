@@ -20,6 +20,10 @@ type BuildCardHtmlOptions = {
   generatedAt?: Date | undefined
   timeZone?: string | undefined
   tzOffsetMinutes?: number | undefined
+  /** Override accent color (e.g. subtitle, section headings) */
+  overrideAccent?: string | undefined
+  /** Override background gradient */
+  overrideGradient?: string | undefined
 }
 
 type CardTheme = {
@@ -264,7 +268,11 @@ export function buildCardHtml(
   options: BuildCardHtmlOptions = {},
 ): string {
   const cardDef = resolveCardDefinition(options.theme)
-  const theme = CARD_THEMES[cardDef.category] ?? CARD_THEMES.narrative
+  const baseTheme = CARD_THEMES[cardDef.category] ?? CARD_THEMES.narrative
+  const theme = {
+    gradient: options.overrideGradient ?? baseTheme.gradient,
+    accent: options.overrideAccent ?? baseTheme.accent,
+  }
   const title = parsed.title || options.label || cardDef.label
   const subtitle = parsed.subtitle || ""
   const body = parsed.body || ""
